@@ -1490,9 +1490,12 @@ a.cta_button {
                                       allowfullscreen style="display:block;">
                                     </iframe>-->
                                   </div>
+                                  <!-- TEMP: hide "Interactive Visualization" link on mobile until mobile support is added to viz/ -->
                                   <div style="margin-top:12px;display:flex;gap:24px;justify-content:flex-end;">
-                                    <a href="viz/" style="color:#fff;text-decoration:underline;">Interactive Visualization</a>
+                                    <a href="viz/" style="color:#fff;text-decoration:underline;display:none;" class="desktop-only-viz-link">Interactive Visualization</a>
                                   </div>
+                                  <style>.desktop-only-viz-link { display: none !important; } @media (min-width: 768px) { .desktop-only-viz-link { display: inline !important; } }</style>
+                                  <!-- END TEMP -->
                                 </div>
 
                               </div><!--end widget-span -->
