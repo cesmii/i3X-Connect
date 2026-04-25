@@ -1,0 +1,3 @@
+window.I3X_CONFIG = {
+  apiUrl: "https://your-api-server.com"
+};
