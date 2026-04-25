@@ -1,0 +1,1304 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>i3X API — How It Works</title>
+  <meta name="description" content="See how the i3X open API standard connects industrial data sources to a unified set of methods — explore, query, history, subscribe, and update.">
+  <link rel="canonical" href="https://www.i3x.dev/viz/">
+  <link rel="manifest" href="manifest.json">
+  <meta name="theme-color" content="#00c40a">
+
+  <!-- Apple PWA -->
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="i3X Viz">
+
+  <!-- OpenGraph -->
+  <meta property="og:type"        content="website">
+  <meta property="og:url"         content="https://www.i3x.dev/viz/">
+  <meta property="og:title"       content="i3X API — How It Works">
+  <meta property="og:description" content="See how the i3X open API standard connects industrial data sources to a unified set of methods — explore, query, history, subscribe, and update.">
+  <meta property="og:image"       content="https://www.i3x.dev/images/i3XHero.png">
+  <meta property="og:image:width"  content="1280">
+  <meta property="og:image:height" content="736">
+  <meta property="og:site_name"   content="i3X">
+
+  <!-- Twitter/X -->
+  <meta name="twitter:card"        content="summary_large_image">
+  <meta name="twitter:title"       content="i3X API — How It Works">
+  <meta name="twitter:description" content="See how the i3X open API standard connects industrial data sources to a unified set of methods — explore, query, history, subscribe, and update.">
+  <meta name="twitter:image"       content="https://www.i3x.dev/images/i3XHero.png">
+  <link rel="icon" href="favicon.ico" type="image/x-icon">
+  <link rel="apple-touch-icon" sizes="57x57" href="images/apple-icon-57x57.png">
+  <link rel="apple-touch-icon" sizes="60x60" href="images/apple-icon-60x60.png">
+  <link rel="apple-touch-icon" sizes="72x72" href="images/apple-icon-72x72.png">
+  <link rel="apple-touch-icon" sizes="76x76" href="images/apple-icon-76x76.png">
+  <link rel="apple-touch-icon" sizes="114x114" href="images/apple-icon-114x114.png">
+  <link rel="apple-touch-icon" sizes="120x120" href="images/apple-icon-120x120.png">
+  <link rel="apple-touch-icon" sizes="144x144" href="images/apple-icon-144x144.png">
+  <link rel="apple-touch-icon" sizes="152x152" href="images/apple-icon-152x152.png">
+  <link rel="apple-touch-icon" sizes="180x180" href="images/apple-icon-180x180.png">
+  <link rel="icon" type="image/png" sizes="192x192"  href="images/android-icon-192x192.png">
+  <link rel="icon" type="image/png" sizes="32x32" href="images/favicon-32x32.png">
+  <link rel="icon" type="image/png" sizes="96x96" href="images/favicon-96x96.png">
+  <link rel="icon" type="image/png" sizes="16x16" href="images/favicon-16x16.png">
+  <link href="https://fonts.googleapis.com/css2?family=Josefin+Sans:wght@400;700&family=Lato:wght@400;700&family=Roboto:wght@300;400&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --bg:         #080b12;
+      --green:      #00c40a;
+      --green-glow: rgba(0,196,10,0.45);
+      --green-dim:  rgba(0,196,10,0.11);
+      --cyan:       #02bbee;
+      --cyan-glow:  rgba(2,187,238,0.35);
+      --cyan-dim:   rgba(2,187,238,0.09);
+      --text:       #dff0df;
+      --text-dim:   rgba(210,235,210,0.50);
+    }
+
+    * { margin:0; padding:0; box-sizing:border-box; }
+
+    html, body {
+      width:100vw; height:100vh;
+      overflow:hidden;
+      background:var(--bg);
+      font-family:'Roboto',sans-serif;
+      color:var(--text);
+      cursor:pointer;
+    }
+
+    body::before {
+      content:''; position:fixed; inset:0;
+      background-image:
+        linear-gradient(rgba(0,196,10,0.025) 1px,transparent 1px),
+        linear-gradient(90deg,rgba(0,196,10,0.025) 1px,transparent 1px);
+      background-size:4vw 4vw;
+      pointer-events:none; z-index:0;
+    }
+    body::after {
+      content:''; position:fixed; inset:0;
+      background:radial-gradient(ellipse 120% 100% at 50% 50%,transparent 35%,rgba(8,11,18,0.75) 100%);
+      pointer-events:none; z-index:0;
+    }
+
+    #lines-svg {
+      position:fixed; inset:0; width:100vw; height:100vh;
+      pointer-events:none; z-index:1;
+    }
+    #app {
+      position:fixed; inset:0; z-index:2; pointer-events:none;
+    }
+
+    /* ── Header ── */
+    #header {
+      position:absolute; top:0; left:0; right:0; height:12vh;
+      display:flex; flex-direction:column;
+      align-items:center; justify-content:center; gap:0.6vh;
+      padding-top:2vh;
+      opacity:0; animation:fadeInDown 1.4s ease 0.3s forwards;
+    }
+    #header h1 {
+      font-family:'Josefin Sans',sans-serif;
+      font-size:3.6vw; font-weight:700;
+      letter-spacing:0.6vw;
+      background:linear-gradient(135deg,var(--green) 0%,var(--cyan) 100%);
+      -webkit-background-clip:text; -webkit-text-fill-color:transparent; background-clip:text;
+    }
+    #header p {
+      font-family:'Lato',sans-serif;
+      font-size:1vw; color:var(--text-dim);
+      letter-spacing:0.35vw;
+    }
+
+    /* ── Column Labels ── */
+    .col-label {
+      position:absolute; top:13.5vh;
+      font-family:'Lato',sans-serif;
+      font-size:0.8vw; font-weight:700;
+      letter-spacing:0.3vw; text-transform:uppercase;
+      opacity:0; transition:opacity 1s ease;
+    }
+    #label-backends { left:3vw;  color:var(--cyan); }
+    #label-methods  { right:3vw; color:var(--green); text-align:right; }
+
+    /* ── Backend Nodes (LEFT) ──
+       left:3vw, width:22vw → right edge at 25vw */
+    .backend-node {
+      position:absolute; left:3vw;
+      width:22vw; height:15vh;
+      border-radius:1vw;
+      background:var(--cyan-dim);
+      border:1px solid rgba(2,187,238,0.25);
+      display:flex; flex-direction:column;
+      justify-content:center; gap:1vh;
+      padding:1.5vh 1.4vw 1.2vh;
+      opacity:0; transform:translateX(-3vw);
+      transition:opacity 0.7s ease, transform 0.7s ease,
+                 border-color 0.5s, box-shadow 0.5s;
+    }
+    .backend-main {
+      display:flex; align-items:center; gap:1vw;
+    }
+    .backend-node.visible { opacity:1; transform:translateX(0); }
+    .backend-node.dimmed  { opacity:0.15; }
+    .backend-node.lit {
+      border-color:var(--cyan);
+      box-shadow:0 0 1vw var(--cyan-glow),inset 0 0 0.8vw rgba(2,187,238,0.05);
+    }
+    /* Fade-out during content swap */
+    .backend-node.swapping {
+      opacity:0 !important;
+      transform:translateX(-1.5vw) scale(0.97) !important;
+    }
+
+    /* Extra glow when actively routing */
+    .backend-node.routed {
+      border-color:#fff;
+      box-shadow:0 0 1.5vw rgba(2,187,238,0.75),
+                 0 0 3vw rgba(2,187,238,0.25),
+                 inset 0 0 1vw rgba(2,187,238,0.10);
+    }
+
+    .backend-icon {
+      width:4vw; height:4vw; min-width:4vw;
+      border-radius:0.7vw;
+      display:flex; align-items:center; justify-content:center;
+      font-size:2vw;
+      background:rgba(2,187,238,0.10);
+    }
+    .backend-text { flex:1; }
+    .backend-text h3 {
+      font-family:'Lato',sans-serif;
+      font-size:1.5vw; font-weight:700;
+      color:var(--cyan); letter-spacing:0.05vw;
+    }
+    .backend-text p {
+      font-size:0.85vw; color:var(--text-dim); margin-top:0.3vh;
+    }
+
+    /* Specialty tags — inside the node, normal flow */
+    .spec-tags {
+      display:flex; gap:0.4vw; flex-wrap:wrap;
+      justify-content:flex-start;
+      opacity:0; transform:translateY(0.3vh);
+      transition:opacity 0.5s ease, transform 0.5s ease;
+    }
+    .spec-tags.show { opacity:1; transform:translateY(0); }
+    .spec-tag {
+      font-size:0.65vw; font-weight:700;
+      letter-spacing:0.03vw; padding:0.2vh 0.5vw;
+      border-radius:2vw; text-transform:uppercase; white-space:nowrap;
+      background:rgba(2,187,238,0.14);
+      border:1px solid rgba(2,187,238,0.42);
+      color:var(--cyan);
+    }
+    /* Highlight a specific tag when its route is active */
+    .spec-tag.active {
+      background:rgba(2,187,238,0.35);
+      border-color:var(--cyan);
+      color:#fff;
+      box-shadow:0 0 0.5vw var(--cyan-glow);
+    }
+
+    /* ── Method Nodes (RIGHT) ──
+       right:3vw, width:22vw → left edge at 75vw */
+    .method-node {
+      position:absolute; right:3vw;
+      width:22vw; height:11vh;
+      border-radius:1vw;
+      background:var(--green-dim);
+      border:1px solid rgba(0,196,10,0.28);
+      display:flex; align-items:center;
+      padding:0 1.4vw; gap:1vw;
+      opacity:0; transform:translateX(3vw);
+      transition:opacity 0.7s ease, transform 0.7s ease,
+                 border-color 0.5s, box-shadow 0.5s;
+    }
+    .method-node.visible { opacity:1; transform:translateX(0); }
+    .method-node.dimmed  { opacity:0.15; }
+    .method-node.lit {
+      border-color:var(--green);
+      box-shadow:0 0 1vw var(--green-glow),inset 0 0 0.8vw rgba(0,196,10,0.05);
+    }
+    .method-node.routed {
+      border-color:#fff;
+      box-shadow:0 0 1.5vw rgba(0,196,10,0.75),
+                 0 0 3vw rgba(0,196,10,0.3),
+                 inset 0 0 1vw rgba(0,196,10,0.10);
+    }
+
+    .method-text { flex:1; }
+    .method-text h3 {
+      font-family:'Lato',sans-serif;
+      font-size:1.5vw; font-weight:700;
+      color:var(--green); letter-spacing:0.08vw;
+    }
+    .method-text p {
+      font-size:0.85vw; color:var(--text-dim); margin-top:0.3vh;
+    }
+    .method-icon {
+      width:4vw; height:4vw; min-width:4vw;
+      border-radius:0.7vw;
+      display:flex; align-items:center; justify-content:center;
+      font-size:2vw;
+      background:rgba(0,196,10,0.12);
+    }
+
+    /* ── Center Orb ── */
+    #orb-wrap {
+      position:absolute; left:50%; top:41vh;
+      transform:translateX(-50%);
+      display:flex; flex-direction:column; align-items:center; gap:1.5vh;
+      opacity:0; animation:fadeIn 1.6s ease 0.8s forwards;
+    }
+    #orb-img {
+      width:14vh; height:14vh; border-radius:50%;
+      animation:orbPulse 3.5s ease-in-out infinite;
+    }
+    @keyframes orbPulse {
+      0%,100% {
+        filter:drop-shadow(0 0 1.5vh rgba(0,196,10,0.65))
+               drop-shadow(0 0 3.5vh rgba(2,187,238,0.30))
+               drop-shadow(0 0 6vh rgba(0,196,10,0.15));
+        transform:scale(1);
+      }
+      50% {
+        filter:drop-shadow(0 0 2.5vh rgba(0,196,10,0.90))
+               drop-shadow(0 0 5vh rgba(2,187,238,0.50))
+               drop-shadow(0 0 9vh rgba(0,196,10,0.25));
+        transform:scale(1.05);
+      }
+    }
+    #orb-label { text-align:center; }
+    #orb-label h2 {
+      font-family:'Josefin Sans',sans-serif;
+      font-size:2vw; font-weight:700; letter-spacing:0.6vw;
+      background:linear-gradient(135deg,var(--green) 0%,var(--cyan) 100%);
+      -webkit-background-clip:text; -webkit-text-fill-color:transparent; background-clip:text;
+    }
+    #orb-label p {
+      font-size:0.7vw; color:var(--text-dim);
+      letter-spacing:0.3vw; text-transform:uppercase; margin-top:0.4vh;
+    }
+
+    /* ── Compose Callout (positive framing) ── */
+    #compose-callout {
+      position:absolute; bottom:13vh; left:50%; transform:translateX(-50%);
+      background:rgba(0,196,10,0.07);
+      border:1px solid rgba(0,196,10,0.30);
+      border-radius:1vw; padding:1.2vh 2.5vw;
+      text-align:center; white-space:normal; max-width:90vw;
+      opacity:0; transition:opacity 0.8s ease;
+    }
+    #compose-callout.show { opacity:1; }
+    #compose-callout h4 {
+      font-family:'Lato',sans-serif; font-size:0.9vw; font-weight:700;
+      color:var(--green); letter-spacing:0.15vw; text-transform:uppercase;
+    }
+    #compose-callout p {
+      font-size:0.7vw; color:rgba(180,230,180,0.70); margin-top:0.5vh;
+    }
+
+    /* ── Step Caption ── */
+    #step-caption {
+      position:absolute; bottom:8vh; left:50%; transform:translateX(-50%);
+      font-family:'Josefin Sans',sans-serif;
+      font-size:1.1vw; letter-spacing:0.2vw; text-transform:uppercase;
+      color:rgba(255,255,255,0.4); white-space:normal; text-align:center; max-width:80vw;
+      opacity:0; transition:opacity 0.5s ease;
+    }
+    #step-caption.show { opacity:1; }
+
+    /* ── Step Indicator ── */
+    #step-indicator {
+      position:absolute; bottom:3vh; left:50%; transform:translateX(-50%);
+      display:flex; flex-direction:column; align-items:center; gap:1vh;
+      opacity:0; animation:fadeIn 1.5s ease 1.5s forwards;
+    }
+    .step-dots { display:flex; gap:0.7vw; align-items:center; }
+    .step-dot {
+      width:0.45vw; height:0.45vw; border-radius:50%;
+      background:rgba(255,255,255,0.15); transition:all 0.5s ease;
+    }
+    .step-dot.done   { background:rgba(0,196,10,0.35); }
+    .step-dot.active {
+      background:var(--green); box-shadow:0 0 0.6vw var(--green); transform:scale(1.5);
+    }
+    #step-hint {
+      font-size:0.6vw; color:rgba(255,255,255,0.22);
+      letter-spacing:0.25vw; text-transform:uppercase;
+      animation:hintPulse 2.2s ease-in-out infinite;
+    }
+
+    /* Orb ripple — pulses outward when backends connect */
+    #orb-ripple {
+      position:absolute; top:0; left:50%; transform:translateX(-50%);
+      width:14vh; height:14vh; border-radius:50%;
+      border:2px solid var(--green);
+      opacity:0; pointer-events:none;
+    }
+    #orb-ripple.fire {
+      animation:rippleOut 1.1s ease-out forwards;
+    }
+    @keyframes rippleOut {
+      0%   { opacity:0.85; transform:translateX(-50%) scale(1); }
+      100% { opacity:0;    transform:translateX(-50%) scale(2.8); }
+    }
+
+    @keyframes fadeInDown {
+      from { opacity:0; transform:translateY(-2vh); }
+      to   { opacity:1; transform:translateY(0); }
+    }
+    @keyframes fadeIn { from { opacity:0; } to { opacity:1; } }
+    @keyframes hintPulse { 0%,100% { opacity:0.3; } 50% { opacity:1; } }
+
+    /* ── Portrait / Rotate Prompt ── */
+    #rotate-prompt {
+      display:none;
+      position:fixed; inset:0; z-index:9999;
+      background:var(--bg);
+      flex-direction:column; align-items:center; justify-content:center;
+      gap:4vh; text-align:center; padding:0 8vw;
+    }
+    @media (orientation:portrait) { #rotate-prompt { display:flex; } }
+    #rotate-phone-svg {
+      width:min(20vw,72px); height:auto;
+      color:var(--cyan);
+      filter:drop-shadow(0 0 10px var(--cyan-glow));
+      animation:rotateHint 2.2s ease-in-out infinite;
+    }
+    @keyframes rotateHint {
+      0%,25%  { transform:rotate(0deg);  }
+      55%,80% { transform:rotate(90deg); }
+      100%    { transform:rotate(0deg);  }
+    }
+    #rotate-title {
+      font-family:'Josefin Sans',sans-serif;
+      font-size:min(7vw,28px); font-weight:700;
+      letter-spacing:0.3vw; text-transform:uppercase;
+      color:var(--cyan);
+    }
+    #rotate-sub { font-size:min(4.5vw,16px); color:var(--text-dim); max-width:70vw; }
+
+    /* ── Mobile landscape: layout & minimum readable font sizes ── */
+    @media (max-width:1024px) {
+      /* Column labels overlap the first node on small screens — hide them */
+      .col-label          { display:none; }
+
+      /* spec-tags are opacity:0 by default (not display:none), so they still
+         consume vertical space inside the fixed-height node and cause overflow.
+         Switch to display:none until .show is applied. */
+      .spec-tags,
+      .spec-tags.show     { display:none; }
+
+      /* Clip anything that still overflows (e.g. very long tag lists) */
+      .backend-node       { overflow:hidden; padding:1vh 1.2vw 0.8vh; }
+      .method-node        { overflow:hidden; }
+
+      /* Tighten the gap between icon and text so the main row fits */
+      .backend-main       { gap:0.6vw; }
+
+      #header h1          { font-size:max(3.6vw,18px); }
+      #header p           { font-size:max(1vw,10px); }
+      .backend-icon       { width:max(4vw,24px); height:max(4vw,24px);
+                            min-width:max(4vw,24px); font-size:max(2vw,13px); }
+      .backend-text h3    { font-size:max(1.5vw,12px); }
+      .backend-text p     { font-size:max(0.85vw,9px); }
+      .spec-tag           { font-size:max(0.65vw,7px); padding:1px max(0.5vw,4px); }
+      .method-icon        { width:max(4vw,24px); height:max(4vw,24px);
+                            min-width:max(4vw,24px); font-size:max(2vw,13px); }
+      .method-text h3     { font-size:max(1.5vw,12px); }
+      .method-text p      { font-size:max(0.85vw,9px); }
+      #orb-label h2       { font-size:max(2vw,15px); }
+      #orb-label p        { font-size:max(0.7vw,8px); }
+      #compose-callout h4 { font-size:max(0.9vw,11px); }
+      #compose-callout p  { font-size:max(0.7vw,9px); }
+      #step-caption       { font-size:max(1.1vw,10px); bottom:13vh; }
+      #step-hint          { font-size:max(0.6vw,9px); }
+      .step-dot           { width:max(0.45vw,5px); height:max(0.45vw,5px); }
+    }
+  </style>
+</head>
+<body>
+
+<svg id="lines-svg" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <filter id="glow-green" x="-150%" y="-150%" width="400%" height="400%">
+      <feGaussianBlur in="SourceGraphic" stdDeviation="3" result="blur"/>
+      <feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+    <filter id="glow-cyan" x="-150%" y="-150%" width="400%" height="400%">
+      <feGaussianBlur in="SourceGraphic" stdDeviation="3" result="blur"/>
+      <feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+    <filter id="glow-white" x="-150%" y="-150%" width="400%" height="400%">
+      <feGaussianBlur in="SourceGraphic" stdDeviation="4" result="blur"/>
+      <feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+  </defs>
+</svg>
+
+<div id="app">
+  <div id="header">
+    <h1>i3X API</h1>
+    <p>Industrial Information Interface eXchange</p>
+  </div>
+
+  <div class="col-label" id="label-backends">Data Sources</div>
+  <div class="col-label" id="label-methods">API Methods</div>
+
+  <!-- ── Backend Nodes (LEFT) ──
+       height:15vh, gaps:2vh → tops: 16,33,50,67 vh → centers: 23.5,40.5,57.5,74.5 vh
+       midpoint ≈ 49vh, close to orb at 48vh -->
+
+  <div class="backend-node" id="b-mqtt" style="top:16vh">
+    <div class="backend-main">
+      <div class="backend-icon">📡</div>
+      <div class="backend-text">
+        <h3>MQTT Broker</h3>
+        <p>Real-time pub/sub · Live edge data</p>
+      </div>
+    </div>
+    <div class="spec-tags" id="tags-mqtt">
+      <span class="spec-tag" id="tag-mqtt-query">live values</span>
+      <span class="spec-tag" id="tag-mqtt-subscribe">pub/sub</span>
+      <span class="spec-tag" id="tag-mqtt-update">write/publish</span>
+    </div>
+  </div>
+
+  <div class="backend-node" id="b-mock" style="top:33vh">
+    <div class="backend-main">
+      <div class="backend-icon">🗃️</div>
+      <div class="backend-text">
+        <h3>At Rest Data</h3>
+        <p>Historian · Relational DB</p>
+      </div>
+    </div>
+    <div class="spec-tags" id="tags-mock">
+      <span class="spec-tag">history</span>
+      <span class="spec-tag">relationships</span>
+    </div>
+  </div>
+
+  <div class="backend-node" id="b-opcua" style="top:50vh">
+    <div class="backend-main">
+      <div class="backend-icon">🖥️</div>
+      <div class="backend-text">
+        <h3>OPC UA</h3>
+        <p>Rich type system · Industrial history</p>
+      </div>
+    </div>
+    <div class="spec-tags" id="tags-opcua">
+      <span class="spec-tag" id="tag-opcua-explore">namespaces</span>
+      <span class="spec-tag" id="tag-opcua-history">historian</span>
+      <span class="spec-tag">strong types</span>
+    </div>
+  </div>
+
+  <div class="backend-node" id="b-custom" style="top:67vh">
+    <div class="backend-main">
+      <div class="backend-icon">🔌</div>
+      <div class="backend-text">
+        <h3>Your Platform</h3>
+        <p>Plug in your own</p>
+      </div>
+    </div>
+    <div class="spec-tags" id="tags-custom">
+      <span class="spec-tag">extensible</span>
+      <span class="spec-tag">open standard</span>
+    </div>
+  </div>
+
+  <!-- ── Center Orb ── -->
+  <div id="orb-wrap">
+    <div id="orb-ripple"></div>
+    <img id="orb-img"
+         src="https://raw.githubusercontent.com/ace-technologies-inc/i3X-Explorer/refs/heads/main/build/icon-1024.png"
+         alt="i3X Orb">
+    <div id="orb-label">
+      <h2>i3X</h2>
+      <p>Open API Standard</p>
+    </div>
+  </div>
+
+  <!-- ── Method Nodes (RIGHT) ──
+       tops: 18,31,44,57,70 vh → centers: 23.5,36.5,49.5,62.5,75.5 vh -->
+
+  <div class="method-node" id="m-explore" style="top:18vh">
+    <div class="method-text"><h3>Explore</h3><p>Namespaces · Types · Objects</p></div>
+    <div class="method-icon">🔭</div>
+  </div>
+  <div class="method-node" id="m-query" style="top:31vh">
+    <div class="method-text"><h3>Query</h3><p>Last-known values · Real-time</p></div>
+    <div class="method-icon">⚡</div>
+  </div>
+  <div class="method-node" id="m-history" style="top:44vh">
+    <div class="method-text"><h3>History</h3><p>Time-series · Range queries</p></div>
+    <div class="method-icon">📈</div>
+  </div>
+  <div class="method-node" id="m-subscribe" style="top:57vh">
+    <div class="method-text"><h3>Subscribe</h3><p>SSE streams · Change events</p></div>
+    <div class="method-icon">📡</div>
+  </div>
+  <div class="method-node" id="m-update" style="top:70vh">
+    <div class="method-text"><h3>Update</h3><p>Write values · Publish</p></div>
+    <div class="method-icon">✏️</div>
+  </div>
+
+  <!-- ── Compose Callout (positive) ── -->
+  <div id="compose-callout">
+    <h4>✓ Composable by Design</h4>
+    <p>Specialized sources combine through i3X to deliver complete, unified coverage</p>
+  </div>
+
+  <div id="step-caption"></div>
+
+  <div id="step-indicator">
+    <div class="step-dots" id="step-dots"></div>
+    <div id="step-hint">Space · Click · Arrow Keys</div>
+  </div>
+</div>
+
+<!-- ── Rotate Prompt (shown only in portrait via CSS) ── -->
+<div id="rotate-prompt">
+  <svg id="rotate-phone-svg" viewBox="0 0 40 70" fill="none"
+       xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+    <rect x="3" y="2" width="34" height="66" rx="6" ry="6"
+          stroke="currentColor" stroke-width="3"/>
+    <circle cx="20" cy="57" r="3.5" fill="currentColor"/>
+    <rect x="13" y="9" width="14" height="3" rx="1.5" fill="currentColor" opacity="0.5"/>
+  </svg>
+  <p id="rotate-title">Rotate your device</p>
+  <p id="rotate-sub">This visualization works best in landscape mode</p>
+</div>
+
+<script>
+// ════════════════════════════════════════════════════════
+//  i3X — Data flows LEFT→RIGHT: Sources → API → Methods
+// ════════════════════════════════════════════════════════
+
+const SVG_NS = 'http://www.w3.org/2000/svg';
+const XLINK  = 'http://www.w3.org/1999/xlink';
+const svgEl  = document.getElementById('lines-svg');
+
+// Which backend primarily handles each method
+// (MQTT: real-time reads/writes/subs; OPC UA: exploration and history)
+const ROUTING = {
+  explore:   'opcua',   // CESMII Profiles
+  query:     'custom',  // Streaming Adapter
+  history:   'mock',    // At Rest Data (historian)
+  subscribe: 'mqtt',
+  update:    'mqtt',
+};
+
+// ── Layout ───────────────────────────────────────────────
+let L = null;  // computed once, referenced by both build functions
+
+function computeLayout() {
+  const W = window.innerWidth;
+  const H = window.innerHeight;
+
+  const ORB_R = H * 0.07;
+  const ORB   = { x: W * 0.50, y: H * 0.48 };
+
+  // Backend right edges at 25vw (left:3vw + width:22vw)
+  // tops: 16,33,50,67 vh, height:15vh → centers: 23.5,40.5,57.5,74.5 vh
+  const BX = W * 0.25;
+  const BACKENDS = {
+    mqtt:   { x: BX, y: H * 0.235 },
+    mock:   { x: BX, y: H * 0.405 },
+    opcua:  { x: BX, y: H * 0.575 },
+    custom: { x: BX, y: H * 0.745 },
+  };
+
+  // Method left edges at 75vw (right:3vw, width:22vw → left at 100-3-22=75vw)
+  // tops: 18,31,44,57,70 vh, height:11vh → centers: 23.5,36.5,49.5,62.5,75.5 vh
+  const MX = W * 0.75;
+  const METHODS = {
+    explore:   { x: MX, y: H * 0.235 },
+    query:     { x: MX, y: H * 0.365 },
+    history:   { x: MX, y: H * 0.495 },
+    subscribe: { x: MX, y: H * 0.625 },
+    update:    { x: MX, y: H * 0.755 },
+  };
+
+  return { W, H, ORB, ORB_R, METHODS, BACKENDS };
+}
+
+// ── SVG helpers ──────────────────────────────────────────
+
+function cubic(x1, y1, x2, y2, t = 0.42) {
+  const dx = Math.abs(x2 - x1) * t;
+  return `M ${x1} ${y1} C ${x1+dx} ${y1}, ${x2-dx} ${y2}, ${x2} ${y2}`;
+}
+
+function makeRail(d, color, opacity, dashed) {
+  const p = document.createElementNS(SVG_NS, 'path');
+  p.setAttribute('d', d);
+  p.setAttribute('fill', 'none');
+  p.setAttribute('stroke', color);
+  p.setAttribute('stroke-width', '1.5');
+  p.setAttribute('stroke-opacity', String(opacity));
+  if (dashed) p.setAttribute('stroke-dasharray', '6 8');
+  return p;
+}
+
+function makeHidden(id, d) {
+  const p = document.createElementNS(SVG_NS, 'path');
+  p.setAttribute('id', id); p.setAttribute('d', d);
+  p.setAttribute('fill', 'none'); p.setAttribute('stroke', 'none');
+  return p;
+}
+
+function makeParticle(pathId, color, filterId, dur, delay, r) {
+  const c = document.createElementNS(SVG_NS, 'circle');
+  c.setAttribute('r', String(r));
+  c.setAttribute('fill', color);
+  c.setAttribute('filter', `url(#${filterId})`);
+  c.setAttribute('opacity', '0.92');
+  const anim = document.createElementNS(SVG_NS, 'animateMotion');
+  anim.setAttribute('dur', `${dur}s`);
+  anim.setAttribute('begin', `${delay}s`);
+  anim.setAttribute('repeatCount', 'indefinite');
+  anim.setAttribute('rotate', 'auto');
+  const mp = document.createElementNS(SVG_NS, 'mpath');
+  mp.setAttributeNS(XLINK, 'xlink:href', `#${pathId}`);
+  anim.appendChild(mp); c.appendChild(anim);
+  return c;
+}
+
+// ── Base lines (dim rails + ambient particles) ────────────
+
+const backendGroups = {};
+const methodGroups  = {};
+
+function buildSVG() {
+  const defs = svgEl.querySelector('defs');
+  while (svgEl.lastChild && svgEl.lastChild !== defs) svgEl.removeChild(svgEl.lastChild);
+
+  L = computeLayout();
+  const { ORB, ORB_R, METHODS, BACKENDS } = L;
+  const pR = Math.max(L.W * 0.0022, 3);
+
+  // Backend → Orb (all solid cyan — every source connects to the standard)
+  Object.entries(BACKENDS).forEach(([bKey, bPt]) => {
+    const g = document.createElementNS(SVG_NS, 'g');
+    g.id = `bg-${bKey}`;
+    g.style.opacity = '0';
+    g.style.transition = 'opacity 1s ease';
+
+    const d   = cubic(bPt.x, bPt.y, ORB.x - ORB_R, ORB.y);
+    const pid = `bp-${bKey}`;
+
+    g.appendChild(makeRail(d, '#02bbee', 0.13, false));
+    g.appendChild(makeHidden(pid, d));
+    [2.3, 2.9].forEach((spd, i) => {
+      g.appendChild(makeParticle(pid, '#22ddff', 'glow-cyan', spd,
+        i * (spd / 2) + Math.random() * 0.4, pR));
+    });
+
+    svgEl.appendChild(g);
+    backendGroups[bKey] = g;
+  });
+
+  // Orb → Methods (all solid green)
+  Object.entries(METHODS).forEach(([mKey, mPt]) => {
+    const g = document.createElementNS(SVG_NS, 'g');
+    g.id = `mg-${mKey}`;
+    g.style.opacity = '0';
+    g.style.transition = 'opacity 1s ease';
+
+    const d   = cubic(ORB.x + ORB_R, ORB.y, mPt.x, mPt.y);
+    const pid = `mp-${mKey}`;
+
+    g.appendChild(makeRail(d, '#00c40a', 0.11, false));
+    g.appendChild(makeHidden(pid, d));
+    [2.2, 2.7, 3.2].forEach((spd, i) => {
+      g.appendChild(makeParticle(pid, '#44ff88', 'glow-green', spd, i * (spd/3), pR));
+    });
+
+    svgEl.appendChild(g);
+    methodGroups[mKey] = g;
+  });
+}
+
+// ── Routing highlight lines (built once, revealed in step 5) ─
+
+const routeGroups = {};  // method → <g>
+
+function buildRouteHighlights() {
+  const { ORB, ORB_R, METHODS, BACKENDS } = L;
+  const pR = Math.max(L.W * 0.003, 4);
+
+  const container = document.createElementNS(SVG_NS, 'g');
+  container.id = 'route-layer';
+  svgEl.appendChild(container);
+
+  Object.entries(ROUTING).forEach(([method, backend]) => {
+    const g = document.createElementNS(SVG_NS, 'g');
+    g.id = `route-${method}`;
+    g.style.opacity = '0';
+    g.style.transition = 'opacity 0.7s ease';
+
+    const bPt = BACKENDS[backend];
+    const mPt = METHODS[method];
+
+    // Bright left segment: backend → orb (cyan)
+    const dL  = cubic(bPt.x, bPt.y, ORB.x - ORB_R, ORB.y);
+    const pidL = `rl-${method}`;
+    const railL = makeRail(dL, '#22ddff', 0.75, false);
+    railL.setAttribute('stroke-width', '2.5');
+    g.appendChild(railL);
+    g.appendChild(makeHidden(pidL, dL));
+    g.appendChild(makeParticle(pidL, '#ffffff', 'glow-white', 1.1, 0,   pR * 1.6));
+    g.appendChild(makeParticle(pidL, '#ffffff', 'glow-white', 1.1, 0.55, pR * 1.0));
+
+    // Bright right segment: orb → method (green)
+    const dR  = cubic(ORB.x + ORB_R, ORB.y, mPt.x, mPt.y);
+    const pidR = `rr-${method}`;
+    const railR = makeRail(dR, '#44ff88', 0.75, false);
+    railR.setAttribute('stroke-width', '2.5');
+    g.appendChild(railR);
+    g.appendChild(makeHidden(pidR, dR));
+    g.appendChild(makeParticle(pidR, '#ffffff', 'glow-white', 1.1, 0.2,  pR * 1.6));
+    g.appendChild(makeParticle(pidR, '#ffffff', 'glow-white', 1.1, 0.75, pR * 1.0));
+
+    container.appendChild(g);
+    routeGroups[method] = g;
+  });
+}
+
+// ── Steps ────────────────────────────────────────────────
+
+const CAPTIONS = [
+  '',
+  'A variety of data sources can implement the i3X interface',
+  'i3X exposes a unified set of API methods to any client',
+  'MQTT delivers Subscribe & Update — other methods need additional sources',
+  'Add a historian and History unlocks too',
+  'Each new source unlocks more of the API',
+  'Real implementations are being built now',
+];
+
+// Step 6: proprietary product definitions
+const IMG = s => `<img src="${s}" style="width:max(2.6vw,18px);height:max(2.6vw,18px);object-fit:contain;border-radius:0.3vw;">`;
+
+const PRODUCTS = [
+  {
+    nodeId:  'b-mqtt',
+    tagsId:  'tags-mqtt',
+    icon:    IMG('favicon-highbyte.png'),
+    name:    'HighByte',
+    desc:    'Industrial data ops · OT/IT bridge',
+    tags:    ['data integration', 'OT/IT bridge', 'MQTT'],
+  },
+  {
+    nodeId:  'b-mock',
+    tagsId:  'tags-mock',
+    icon:    IMG('favicon-inductive.png'),
+    name:    'Ignition',
+    desc:    'SCADA and IIOT integration platform',
+    tags:    ['SCADA', 'historians', 'HMI'],
+  },
+  {
+    nodeId:  'b-opcua',
+    tagsId:  'tags-opcua',
+    icon:    IMG('favicon-timebase.ico'),
+    name:    'Flow Timebase',
+    desc:    'Industrial time-series · IIoT data store',
+    tags:    ['time-series', 'industrial IoT', 'edge'],
+  },
+  {
+    nodeId:  'b-custom',
+    tagsId:  'tags-custom',
+    icon:    IMG('favicon-postgres.ico'),
+    name:    'PostgreSQL',
+    desc:    'Relational database · Open source',
+    tags:    ['relational', 'open source', 'SQL'],
+  },
+];
+
+// Intermediate names used in step 5 (compose step) — also needed for UNDO[6]
+const STEP5_NODES = {
+  opcua:  { name: 'CESMII Profiles',   desc: 'Smart manufacturing · Semantic namespaces', icon: IMG('favicon-cesmii.png') },
+  custom: { name: 'Streaming Adapter', desc: 'Real-time data bridge · Edge connectivity', icon: IMG('favicon-litmus.ico') },
+};
+
+function swapBackend(product, delay) {
+  setTimeout(() => {
+    const node = document.getElementById(product.nodeId);
+    node.classList.add('swapping');
+
+    setTimeout(() => {
+      // Swap content
+      node.querySelector('.backend-icon').innerHTML = product.icon;
+      node.querySelector('.backend-text h3').textContent = product.name;
+      node.querySelector('.backend-text p').textContent = product.desc;
+
+      // Rebuild spec tags
+      const tagsEl = document.getElementById(product.tagsId);
+      tagsEl.innerHTML = product.tags
+        .map(t => `<span class="spec-tag">${t}</span>`)
+        .join('');
+      // Keep tags visible if they were shown
+      tagsEl.classList.add('show');
+
+      node.classList.remove('swapping');
+    }, 420);
+  }, delay);
+}
+
+const STEPS = [
+  () => {},  // 0: orb only
+
+  () => {    // 1: backends appear, then their lines, then orb ripples
+    document.getElementById('label-backends').style.opacity = '1';
+    const bKeys = ['b-mqtt','b-mock','b-opcua','b-custom'];
+    bKeys.forEach((id,i) =>
+      setTimeout(() => document.getElementById(id).classList.add('visible'), i*150));
+
+    // Lines follow after nodes are in
+    const lineStart = bKeys.length * 150 + 150;
+    Object.keys(backendGroups).forEach((b,i) => setTimeout(() => {
+      backendGroups[b].style.opacity = '1';
+      document.getElementById(`b-${b}`).classList.add('lit');
+    }, lineStart + i*120));
+
+    // Orb ripple after last line arrives
+    const rippleAt = lineStart + Object.keys(backendGroups).length * 120 + 250;
+    setTimeout(() => {
+      const r = document.getElementById('orb-ripple');
+      r.classList.remove('fire');
+      void r.offsetWidth;  // restart animation
+      r.classList.add('fire');
+    }, rippleAt);
+
+    showCaption(CAPTIONS[1], 400);
+  },
+
+  () => {    // 2: methods appear, then their lines
+    document.getElementById('label-methods').style.opacity = '1';
+    const mIds = ['m-explore','m-query','m-history','m-subscribe','m-update'];
+    mIds.forEach((id,i) =>
+      setTimeout(() => document.getElementById(id).classList.add('visible'), i*130));
+
+    // Lines follow after nodes are in
+    const lineStart = mIds.length * 130 + 150;
+    Object.keys(methodGroups).forEach((m,i) => setTimeout(() => {
+      methodGroups[m].style.opacity = '1';
+      document.getElementById(`m-${m}`).classList.add('lit');
+    }, lineStart + i*110));
+
+    showCaption(CAPTIONS[2], 300);
+  },
+
+  () => {    // 3: MQTT-only scenario — dim everything except MQTT and its covered methods
+    // Dim non-MQTT backend nodes
+    ['mock','opcua','custom'].forEach(b =>
+      document.getElementById(`b-${b}`).classList.add('dimmed'));
+
+    // Dim methods MQTT can't fully serve
+    ['explore','query','history'].forEach(m =>
+      document.getElementById(`m-${m}`).classList.add('dimmed'));
+
+    // Dim base lines for non-MQTT backends (opacity near-zero → particles invisible)
+    ['mock','opcua','custom'].forEach(b => {
+      backendGroups[b].style.opacity = '0.04';
+    });
+
+    // Dim base lines for non-active methods
+    ['explore','query','history'].forEach(m => {
+      methodGroups[m].style.opacity = '0.04';
+    });
+
+    // Show MQTT specialty tags
+    document.getElementById('tags-mqtt').classList.add('show');
+
+    // Bright routing beams for the two methods MQTT covers
+    setTimeout(() => { routeGroups['subscribe'].style.opacity = '1'; }, 500);
+    setTimeout(() => { routeGroups['update'].style.opacity = '1'; }, 900);
+
+    showCaption(CAPTIONS[3], 300);
+  },
+
+  () => {    // 4: add At Rest Data → History lights up
+    // Un-dim At Rest Data and restore its line
+    document.getElementById('b-mock').classList.remove('dimmed');
+    backendGroups['mock'].style.opacity = '1';
+
+    // Show At Rest Data spec tags
+    setTimeout(() => document.getElementById('tags-mock').classList.add('show'), 400);
+
+    // Un-dim History and restore its line
+    setTimeout(() => {
+      document.getElementById('m-history').classList.remove('dimmed');
+      methodGroups['history'].style.opacity = '1';
+    }, 700);
+
+    // Routing beam: At Rest Data → orb → History, with routed glow on both ends
+    setTimeout(() => {
+      routeGroups['history'].style.opacity = '1';
+      document.getElementById('b-mock').classList.add('routed');
+      document.getElementById('m-history').classList.add('routed');
+    }, 1100);
+
+    showCaption(CAPTIONS[4], 300);
+  },
+
+  () => {    // 5: compose step — CESMII Profiles lights up Explore; Streaming Adapter lights up Query
+
+    // ── Sub-step A: OPC UA → CESMII Profiles ──────────────
+    const opcuaNode = document.getElementById('b-opcua');
+    opcuaNode.classList.add('swapping');
+    setTimeout(() => {
+      opcuaNode.querySelector('.backend-icon').innerHTML       = STEP5_NODES.opcua.icon;
+      opcuaNode.querySelector('.backend-text h3').textContent = STEP5_NODES.opcua.name;
+      opcuaNode.querySelector('.backend-text p').textContent  = STEP5_NODES.opcua.desc;
+      opcuaNode.classList.remove('swapping');
+      opcuaNode.classList.remove('dimmed');
+      backendGroups['opcua'].style.opacity = '1';
+    }, 420);
+
+    // Explore method un-dims
+    setTimeout(() => {
+      document.getElementById('m-explore').classList.remove('dimmed');
+      methodGroups['explore'].style.opacity = '1';
+    }, 800);
+
+    // Routing beam + routed glow
+    setTimeout(() => {
+      routeGroups['explore'].style.opacity = '1';
+      opcuaNode.classList.add('routed');
+      document.getElementById('m-explore').classList.add('routed');
+    }, 1200);
+
+    setTimeout(() => document.getElementById('tags-opcua').classList.add('show'), 1500);
+
+    // ── Sub-step B: Your Platform → Streaming Adapter ──────
+    const customNode = document.getElementById('b-custom');
+    setTimeout(() => {
+      customNode.classList.add('swapping');
+      setTimeout(() => {
+        customNode.querySelector('.backend-icon').innerHTML       = STEP5_NODES.custom.icon;
+        customNode.querySelector('.backend-text h3').textContent = STEP5_NODES.custom.name;
+        customNode.querySelector('.backend-text p').textContent  = STEP5_NODES.custom.desc;
+        customNode.classList.remove('swapping');
+        customNode.classList.remove('dimmed');
+        backendGroups['custom'].style.opacity = '1';
+      }, 420);
+    }, 2200);
+
+    // Query method un-dims
+    setTimeout(() => {
+      document.getElementById('m-query').classList.remove('dimmed');
+      methodGroups['query'].style.opacity = '1';
+    }, 3000);
+
+    // Routing beam + routed glow
+    setTimeout(() => {
+      routeGroups['query'].style.opacity = '1';
+      customNode.classList.add('routed');
+      document.getElementById('m-query').classList.add('routed');
+    }, 3400);
+
+    // Ripple once all sources are lit
+    setTimeout(fireRipple, 3600);
+
+    setTimeout(() => document.getElementById('tags-custom').classList.add('show'), 3700);
+
+    showCaption(CAPTIONS[5], 300);
+  },
+
+  () => {    // 6: swap all sources for real proprietary products
+    // Clear all routed state from compose step
+    ['b-mock','b-opcua','b-custom'].forEach(id =>
+      document.getElementById(id).classList.remove('routed'));
+    ['m-explore','m-query','m-history'].forEach(id =>
+      document.getElementById(id).classList.remove('routed'));
+
+    // Hide all routing beams
+    ['subscribe','update','history','explore','query'].forEach(m => {
+      routeGroups[m].style.opacity = '0';
+    });
+
+    // Show spec tags on any backends that don't have them yet
+    ['mqtt','mock','opcua','custom'].forEach(b =>
+      document.getElementById(`tags-${b}`).classList.add('show'));
+
+    // Stagger the swap animations
+    PRODUCTS.forEach((product, i) => swapBackend(product, i * 350 + 200));
+
+    // Show callout, then ripple once and repeat every 15 s while slide is shown
+    setTimeout(() => {
+      document.getElementById('compose-callout').querySelector('h4').textContent =
+        '✓ In development now!';
+      document.getElementById('compose-callout').querySelector('p').textContent =
+        'Leading industrial platforms are implementing i3X — compose your own systems';
+      document.getElementById('compose-callout').classList.add('show');
+      setTimeout(fireRipple, 600);
+      pulseInterval = setInterval(fireRipple, 15000);
+    }, PRODUCTS.length * 350 + 700);
+
+    showCaption(CAPTIONS[6], 300);
+  },
+];
+
+// ── UI helpers ───────────────────────────────────────────
+
+let pulseInterval = null;
+
+function fireRipple() {
+  const r = document.getElementById('orb-ripple');
+  r.classList.remove('fire');
+  void r.offsetWidth;
+  r.classList.add('fire');
+}
+
+function showCaption(text, delay) {
+  const el = document.getElementById('step-caption');
+  setTimeout(() => { el.textContent = text; el.classList.add('show'); }, delay);
+  setTimeout(() => el.classList.remove('show'), delay + 2800);
+}
+
+// Store original backend content at load time so step 5 (product swap) can be undone
+const originalBackends = {};
+['mqtt','mock','opcua','custom'].forEach(id => {
+  const node = document.getElementById(`b-${id}`);
+  originalBackends[id] = {
+    icon:     node.querySelector('.backend-icon').innerHTML,
+    title:    node.querySelector('.backend-text h3').textContent,
+    desc:     node.querySelector('.backend-text p').textContent,
+    tagsHTML: node.querySelector('.spec-tags').innerHTML,
+  };
+});
+
+// ── Per-step undo functions ───────────────────────────────
+// UNDO[n] reverses step n, returning to step n-1 state.
+const UNDO = [
+  null,  // step 0: nothing to undo
+
+  () => {  // undo step 1 → back to step 0
+    document.getElementById('label-backends').style.opacity = '0';
+    ['b-mqtt','b-mock','b-opcua','b-custom'].forEach(id =>
+      document.getElementById(id).classList.remove('visible','lit'));
+    Object.values(backendGroups).forEach(g => g.style.opacity = '0');
+  },
+
+  () => {  // undo step 2 → back to step 1
+    document.getElementById('label-methods').style.opacity = '0';
+    ['m-explore','m-query','m-history','m-subscribe','m-update'].forEach(id =>
+      document.getElementById(id).classList.remove('visible','lit'));
+    Object.values(methodGroups).forEach(g => g.style.opacity = '0');
+  },
+
+  () => {  // undo step 3 (MQTT-only) → back to step 2
+    ['mock','opcua','custom'].forEach(b => {
+      document.getElementById(`b-${b}`).classList.remove('dimmed');
+      backendGroups[b].style.opacity = '1';
+    });
+    ['explore','query','history'].forEach(m => {
+      document.getElementById(`m-${m}`).classList.remove('dimmed');
+      methodGroups[m].style.opacity = '1';
+    });
+    document.getElementById('tags-mqtt').classList.remove('show');
+    routeGroups['subscribe'].style.opacity = '0';
+    routeGroups['update'].style.opacity = '0';
+  },
+
+  () => {  // undo step 4 (At Rest Data + History) → back to step 3
+    document.getElementById('b-mock').classList.add('dimmed');
+    document.getElementById('b-mock').classList.remove('routed');
+    backendGroups['mock'].style.opacity = '0.04';
+    document.getElementById('tags-mock').classList.remove('show');
+    document.getElementById('m-history').classList.add('dimmed');
+    document.getElementById('m-history').classList.remove('routed');
+    methodGroups['history'].style.opacity = '0.04';
+    routeGroups['history'].style.opacity = '0';
+  },
+
+  () => {  // undo step 5 (compose) → back to step 4
+    // ── Undo CESMII Profiles → restore OPC UA ──
+    const opcuaNode = document.getElementById('b-opcua');
+    routeGroups['explore'].style.opacity = '0';
+    opcuaNode.classList.remove('routed');
+    document.getElementById('m-explore').classList.remove('routed');
+    document.getElementById('m-explore').classList.add('dimmed');
+    methodGroups['explore'].style.opacity = '0.04';
+    document.getElementById('tags-opcua').classList.remove('show');
+    opcuaNode.classList.add('swapping');
+    setTimeout(() => {
+      const orig = originalBackends['opcua'];
+      opcuaNode.querySelector('.backend-icon').innerHTML      = orig.icon;
+      opcuaNode.querySelector('.backend-text h3').textContent = orig.title;
+      opcuaNode.querySelector('.backend-text p').textContent  = orig.desc;
+      opcuaNode.querySelector('.spec-tags').innerHTML         = orig.tagsHTML;
+      opcuaNode.classList.remove('swapping');
+      opcuaNode.classList.add('dimmed');
+      backendGroups['opcua'].style.opacity = '0.04';
+    }, 420);
+
+    // ── Undo Streaming Adapter → restore Your Platform ──
+    const customNode = document.getElementById('b-custom');
+    routeGroups['query'].style.opacity = '0';
+    customNode.classList.remove('routed');
+    document.getElementById('m-query').classList.remove('routed');
+    document.getElementById('m-query').classList.add('dimmed');
+    methodGroups['query'].style.opacity = '0.04';
+    document.getElementById('tags-custom').classList.remove('show');
+    customNode.classList.add('swapping');
+    setTimeout(() => {
+      const orig = originalBackends['custom'];
+      customNode.querySelector('.backend-icon').innerHTML      = orig.icon;
+      customNode.querySelector('.backend-text h3').textContent = orig.title;
+      customNode.querySelector('.backend-text p').textContent  = orig.desc;
+      customNode.querySelector('.spec-tags').innerHTML         = orig.tagsHTML;
+      customNode.classList.remove('swapping');
+      customNode.classList.add('dimmed');
+      backendGroups['custom'].style.opacity = '0.04';
+    }, 420);
+  },
+
+  () => {  // undo step 6 (product swap) → back to step 5 (compose state)
+    clearInterval(pulseInterval);
+    pulseInterval = null;
+    document.getElementById('compose-callout').classList.remove('show');
+    // Restore all backends: mqtt/mock get original content; opcua/custom get step-5 names
+    ['mqtt','mock','opcua','custom'].forEach(id => {
+      const node = document.getElementById(`b-${id}`);
+      node.classList.add('swapping');
+      setTimeout(() => {
+        const orig = originalBackends[id];
+        const s5 = STEP5_NODES[id];
+        node.querySelector('.backend-icon').innerHTML      = (s5 && s5.icon) ? s5.icon : orig.icon;
+        node.querySelector('.backend-text h3').textContent = s5 ? s5.name : orig.title;
+        node.querySelector('.backend-text p').textContent  = s5 ? s5.desc : orig.desc;
+        node.querySelector('.spec-tags').innerHTML         = orig.tagsHTML;
+        node.classList.remove('swapping');
+      }, 420);
+    });
+    // Re-apply step 5 state: routing beams, routed glows, spec tags
+    setTimeout(() => {
+      ['explore','query','history'].forEach(m => { routeGroups[m].style.opacity = '1'; });
+      ['b-mock','b-opcua','b-custom'].forEach(id =>
+        document.getElementById(id).classList.add('routed'));
+      ['m-explore','m-query','m-history'].forEach(id =>
+        document.getElementById(id).classList.add('routed'));
+      ['mqtt','mock','opcua','custom'].forEach(b =>
+        document.getElementById(`tags-${b}`).classList.add('show'));
+    }, 500);
+  },
+];
+
+// ── Navigation ────────────────────────────────────────────
+
+let currentStep = 0;
+const TOTAL = STEPS.length;
+
+function buildDots() {
+  const c = document.getElementById('step-dots');
+  for (let i = 0; i < TOTAL; i++) {
+    const d = document.createElement('div');
+    d.id = `dot-${i}`;
+    d.className = 'step-dot' + (i === 0 ? ' active' : '');
+    c.appendChild(d);
+  }
+}
+
+function updateDots() {
+  for (let i = 0; i < TOTAL; i++) {
+    const d = document.getElementById(`dot-${i}`);
+    d.className = 'step-dot'
+      + (i < currentStep  ? ' done'   : '')
+      + (i === currentStep ? ' active' : '');
+  }
+  const atStart = currentStep === 0;
+  const atEnd   = currentStep === TOTAL - 1;
+  document.getElementById('step-hint').textContent =
+    atEnd   ? '← Back · Space · Click to Restart' :
+    atStart ? 'Space · Click · → to Advance'       :
+              '← Back · Space · Click · → Forward';
+}
+
+function advance() {
+  if (currentStep < TOTAL - 1) { currentStep++; STEPS[currentStep](); updateDots(); }
+  else location.reload();
+}
+
+function retreat() {
+  if (currentStep > 0) { UNDO[currentStep](); currentStep--; updateDots(); }
+}
+
+document.addEventListener('keydown', e => {
+  if (e.code === 'Space' || e.code === 'ArrowRight') { e.preventDefault(); advance(); }
+  if (e.code === 'ArrowLeft') { e.preventDefault(); retreat(); }
+});
+
+// Touch: swipe left=advance, swipe right=retreat, tap=advance
+let _tx = 0, _ty = 0, _lastTouch = 0;
+document.addEventListener('touchstart', e => {
+  _tx = e.touches[0].clientX;
+  _ty = e.touches[0].clientY;
+}, { passive: true });
+document.addEventListener('touchend', e => {
+  _lastTouch = Date.now();
+  const dx = e.changedTouches[0].clientX - _tx;
+  const dy = e.changedTouches[0].clientY - _ty;
+  if (Math.abs(dx) > 50 && Math.abs(dx) > Math.abs(dy)) {
+    dx < 0 ? advance() : retreat();  // horizontal swipe
+  } else {
+    advance();  // tap
+  }
+  e.preventDefault();  // suppress synthetic click
+}, { passive: false });
+
+// Click (mouse/trackpad); ignore if a touch event just fired
+document.addEventListener('click', () => {
+  if (Date.now() - _lastTouch < 500) return;
+  advance();
+});
+
+// ── Rebuild SVG on resize / orientation change ────────────
+// Saves the current opacity state of every group, rebuilds all paths
+// for the new viewport dimensions, then restores state instantly
+// (no transition) so the lines snap to their correct positions.
+function rebuildSVG() {
+  const snap = obj => { const s = {}; Object.keys(obj).forEach(k => s[k] = obj[k].style.opacity); return s; };
+  const bS = snap(backendGroups), mS = snap(methodGroups), rS = snap(routeGroups);
+
+  buildSVG();
+  buildRouteHighlights();
+
+  // Disable transitions so the restore is instant (no fade-from-zero)
+  [...Object.values(backendGroups), ...Object.values(methodGroups), ...Object.values(routeGroups)]
+    .forEach(g => g.style.transition = 'none');
+
+  Object.keys(backendGroups).forEach(k => backendGroups[k].style.opacity = bS[k] || '0');
+  Object.keys(methodGroups).forEach(k =>  methodGroups[k].style.opacity  = mS[k] || '0');
+  Object.keys(routeGroups).forEach(k =>   routeGroups[k].style.opacity   = rS[k] || '0');
+
+  // Re-enable transitions after the browser has committed the snap
+  requestAnimationFrame(() => {
+    Object.values(backendGroups).forEach(g => g.style.transition = 'opacity 1s ease');
+    Object.values(methodGroups).forEach(g =>  g.style.transition = 'opacity 1s ease');
+    Object.values(routeGroups).forEach(g =>   g.style.transition = 'opacity 0.7s ease');
+  });
+}
+
+let _resizeTimer;
+window.addEventListener('resize', () => {
+  clearTimeout(_resizeTimer);
+  _resizeTimer = setTimeout(rebuildSVG, 150);
+});
+
+buildSVG();
+buildRouteHighlights();
+buildDots();
+
+// Register service worker for PWA installability
+if ('serviceWorker' in navigator) {
+  navigator.serviceWorker.register('sw.js');
+}
+</script>
+</body>
+</html>
