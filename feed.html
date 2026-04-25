@@ -1361,7 +1361,6 @@ body, .body-wrapper, .footer, .footer .container-fluid,
     let offset = 0;
     const PAGE = 20;
     let searchTimer = null;
-    let lastPostCount = 0;
     let loading = false;
     let hasMore = true;
     let infiniteObserver = null;
@@ -1473,13 +1472,10 @@ body, .body-wrapper, .footer, .footer .container-fluid,
         if (!append) {
           const cached = (() => { try { return JSON.parse(localStorage.getItem(CACHE_KEY)); } catch { return null; } })();
           if (cached && cached.length) {
-            const ts = localStorage.getItem(CACHE_TS_KEY);
-            const age = ts ? Math.round((Date.now() - ts) / 3600000) : null;
-            const label = age !== null ? `${age}h ago` : "previously";
-            feed.innerHTML = `<div class="feed-empty" style="background:#fff8e1;color:#7a5c00;border:1px solid #ffe082;border-radius:8px;padding:10px 16px;margin-bottom:16px;">Live feed unavailable — showing content cached ${label}.</div>`;
+            feed.innerHTML = "";
             for (const p of cached) feed.appendChild(createPostCard(p, []));
           } else {
-            feed.innerHTML = '<div class="feed-empty">Could not connect to the feed API. Make sure the server is running.</div>';
+            feed.innerHTML = '<div class="feed-empty">No posts available. Check back soon.</div>';
           }
         }
       }
@@ -1549,18 +1545,6 @@ body, .body-wrapper, .footer, .footer .container-fluid,
       return card;
     }
 
-    async function pollForUpdates() {
-      try {
-        const r = await fetch(`${API}/status`);
-        const d = await r.json();
-        if (lastPostCount && d.total_posts_scraped !== lastPostCount) {
-          loadFeed();
-        }
-        lastPostCount = d.total_posts_scraped;
-      } catch {}
-    }
-
-    setInterval(pollForUpdates, 15000);
     loadFeed();
   </script>
 
