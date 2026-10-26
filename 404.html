@@ -1,0 +1,20 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>Page not found | i3X</title>
+  <meta name="robots" content="noindex">
+  <script>
+    // SDK docs moved to sdk.i3x.dev -- forward deep links like /sdk/quickstart
+    (function () {
+      var m = window.location.pathname.match(/^\/sdk(\/.*)?$/);
+      if (m) {
+        window.location.replace("https://sdk.i3x.dev" + (m[1] || "/") + window.location.search + window.location.hash);
+      }
+    })();
+  </script>
+</head>
+<body>
+  <p>Sorry, that page doesn't exist. <a href="/">Return to the i3X home page</a>.</p>
+</body>
+</html>
