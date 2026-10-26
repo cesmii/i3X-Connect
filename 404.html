@@ -5,11 +5,12 @@
   <title>Page not found | i3X</title>
   <meta name="robots" content="noindex">
   <script>
-    // SDK docs moved to sdk.i3x.dev -- forward deep links like /sdk/quickstart
+    // SDK docs and conformance tests moved to their own subdomains --
+    // forward deep links like /sdk/quickstart or /conformance/results
     (function () {
-      var m = window.location.pathname.match(/^\/sdk(\/.*)?$/);
+      var m = window.location.pathname.match(/^\/(sdk|conformance)(\/.*)?$/);
       if (m) {
-        window.location.replace("https://sdk.i3x.dev" + (m[1] || "/") + window.location.search + window.location.hash);
+        window.location.replace("https://" + m[1] + ".i3x.dev" + (m[2] || "/") + window.location.search + window.location.hash);
       }
     })();
   </script>
